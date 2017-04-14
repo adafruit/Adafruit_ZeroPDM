@@ -201,7 +201,18 @@ bool Adafruit_ZeroPDM::configure(uint8_t numChannels, uint32_t sampleRateHz, uin
 }
 
 uint32_t Adafruit_ZeroPDM::read(void) {
+  // Read the sample from the I2S data register.
+  // This will wait for the I2S hardware to be ready to send the byte.
+  return i2s_serializer_read_wait(&_i2s_instance, _i2sserializer);
+}
+
+
+bool Adafruit_ZeroPDM::read(uint32_t *buffer, int bufsiz) {
+  // Read the sample from the I2S data register.
+  // This will wait for the I2S hardware to be ready to send the byte.
   // Write the sample byte to the I2S data register.
   // This will wait for the I2S hardware to be ready to receive the byte.
-  return i2s_serializer_read_wait(&_i2s_instance, _i2sserializer);
+  status_code stat = i2s_serializer_read_buffer_wait(&_i2s_instance, _i2sserializer, buffer, bufsiz);
+
+  return (stat == STATUS_OK); // anything other than OK is a problem
 }

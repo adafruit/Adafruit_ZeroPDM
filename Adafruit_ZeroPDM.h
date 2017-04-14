@@ -50,7 +50,7 @@
 #define I2S_SDRX_SERIALIZERMODE I2S_SERIALIZER_RECEIVE
 
 // Uncomment to enable debug message output.
-//#define DEBUG
+#define DEBUG
 
 // Define where debug output is printed (the native USB port on the Zero).
 #define DEBUG_PRINTER Serial
@@ -73,6 +73,7 @@ public:
   // Read a single sample from the I2S subsystem.  Will wait until the I2S
   // hardware is ready to receive the sample.
   uint32_t read(void);
+  bool read(uint32_t *buffer, int bufsiz);
 
 private:
   int _clk, _data;
