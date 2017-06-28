@@ -65,10 +65,10 @@ public:
 
   // Initialize the I2S audio  receiver.
   bool begin();
+  void end();
 
-  // Configure the transmitter with the specified number of channels, sample rate
-  // (in hertz), and number of bits per sample (one of 8, 16, 24, 32).
-  bool configure(uint8_t numChannels, uint32_t sampleRateHz, uint8_t bitsPerSample);
+  // Configure the transmitter with the sample rate (in hertz
+  bool configure(uint32_t sampleRateHz);
 
   // Read a single sample from the I2S subsystem.  Will wait until the I2S
   // hardware is ready to receive the sample.
