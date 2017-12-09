@@ -195,7 +195,23 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 uint32_t Adafruit_ZeroPDM::read(void) {
   // Read the sample from the I2S data register.
   // This will wait for the I2S hardware to be ready to send the byte.
-  return i2s_serializer_read_wait(&_i2s_instance, _i2sserializer);
+  //return i2s_serializer_read_wait(&_i2s_instance, _i2sserializer);
+
+  // replace i2s_serializer_read_wait with deASF'd code:
+  uint32_t sync_bit, ready_bit;
+  uint32_t data;
+  ready_bit = I2S_INTFLAG_RXRDY0 << _i2sserializer;
+  while (!(_i2s_instance.hw->INTFLAG.reg & ready_bit)) {
+    /* Wait until ready to transmit */
+  }
+  sync_bit = I2S_SYNCBUSY_DATA0 << _i2sserializer;
+  while (_i2s_instance.hw->SYNCBUSY.reg & sync_bit) {
+    /* Wait sync */
+  }
+  /* Read data */
+  data = _i2s_instance.hw->DATA[_i2sserializer].reg;
+  _i2s_instance.hw->INTFLAG.reg = ready_bit;
+  return data;
 }
 
 
