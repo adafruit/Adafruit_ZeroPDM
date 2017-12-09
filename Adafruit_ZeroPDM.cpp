@@ -103,7 +103,7 @@ void Adafruit_ZeroPDM::end(void) {
   i2s_disable(&_i2s_instance);
 }
 
-bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz) {
+bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   // Convert bit per sample int into explicit ASF values.
 
   // Disable I2S while it is being reconfigured to prevent unexpected output.
@@ -118,6 +118,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz) {
   // to the SCK frequency.
   gclk_generator.source_clock = SYSTEM_CLOCK_SOURCE_DFLL;
   gclk_generator.division_factor = F_CPU / (sampleRateHz*16); // 16 clocks for 16 stereo bits
+
   // Set the GCLK generator config and enable it.
   system_gclk_gen_set_config(_gclk, &gclk_generator);
   system_gclk_gen_enable(_gclk);
@@ -133,10 +134,16 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz) {
   i2s_clock_instance.clock.sck_src = I2S_SERIAL_CLOCK_SOURCE_MCKDIV;
   i2s_clock_instance.clock.sck_div = 1;
   // Configure number of channels and slot size (based on bits per sample).
-  i2s_clock_instance.frame.number_slots = 2; // must be stereo for PDM2
-  i2s_clock_instance.frame.slot_size = I2S_SLOT_SIZE_16_BIT; // must be 16 bits (32 bit word containing stereo data)
-  // Configure 1-bit delay in each frame (I2S default).
-  i2s_clock_instance.frame.data_delay = I2S_DATA_DELAY_1;
+  if (stereo) {
+    i2s_clock_instance.frame.number_slots = 2; // must be stereo for PDM2
+    i2s_clock_instance.frame.slot_size = I2S_SLOT_SIZE_16_BIT; // must be 16 bits (32 bit word containing stereo data)
+  } else {
+    i2s_clock_instance.frame.number_slots = 2;
+    i2s_clock_instance.frame.slot_size = I2S_SLOT_SIZE_32_BIT;
+  }
+
+  // Configure 1-bit delay in each frame
+  i2s_clock_instance.frame.data_delay = I2S_DATA_DELAY_0;
   // Configure FS generation from SCK clock.
   i2s_clock_instance.frame.frame_sync.source = I2S_FRAME_SYNC_SOURCE_SCKDIV;
   // Configure FS change on full slot change (I2S default).
@@ -160,7 +167,11 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz) {
   i2s_serializer_get_config_defaults(&i2s_serializer_instance);
   // Configure clock unit to use with serializer, and set serializer as an output.
   i2s_serializer_instance.clock_unit = _i2sclock;
-  i2s_serializer_instance.mode = I2S_SERIALIZER_PDM2; //Serializer is used to receive PDM data on each clock edge
+  if (stereo) {
+    i2s_serializer_instance.mode = I2S_SERIALIZER_PDM2; //Serializer is used to receive PDM data on each clock edge
+  } else {
+    i2s_serializer_instance.mode = I2S_SERIALIZER_RECEIVE; // act like I2S
+  }
   // Configure serializer data size.
   i2s_serializer_instance.data_size = I2S_DATA_SIZE_32BIT; // anything other than 32 bits is ridiculous to manage, force this to be 32
   // Enable SD pin.  See Adafruit_ZeroI2S.h for default pin value.

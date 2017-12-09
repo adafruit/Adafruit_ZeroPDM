@@ -68,7 +68,7 @@ public:
   void end();
 
   // Configure the transmitter with the sample rate (in hertz
-  bool configure(uint32_t sampleRateHz);
+  bool configure(uint32_t sampleRateHz, boolean stereo);
 
   // Read a single sample from the I2S subsystem.  Will wait until the I2S
   // hardware is ready to receive the sample.
