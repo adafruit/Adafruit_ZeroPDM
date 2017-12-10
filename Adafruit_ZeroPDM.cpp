@@ -184,10 +184,21 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     return false;
   }
 
-  // Enable everything configured above.
-  i2s_enable(&_i2s_instance);
-  i2s_clock_unit_enable(&_i2s_instance, _i2sclock);
-  i2s_serializer_enable(&_i2s_instance, _i2sserializer);
+  /* Enable everything configured above. */
+
+  // Replace "i2s_enable(&_i2s_instance);" with:
+  while (_i2s_instance.hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE);  // Sync wait
+  _i2s_instance.hw->CTRLA.reg |= I2S_SYNCBUSY_ENABLE;
+
+  // Replace "i2s_clock_unit_enable(&_i2s_instance, _i2sclock);" with:
+  uint32_t cken_bit = I2S_CTRLA_CKEN0 << _i2sclock;
+  while (_i2s_instance.hw->SYNCBUSY.reg & cken_bit); // Sync wait
+  _i2s_instance.hw->CTRLA.reg |= cken_bit;
+
+  // Replace "i2s_serializer_enable(&_i2s_instance, _i2sserializer);" with:
+  uint32_t seren_bit = I2S_CTRLA_SEREN0 << _i2sserializer;
+  while (_i2s_instance.hw->SYNCBUSY.reg & seren_bit); // Sync wait
+  _i2s_instance.hw->CTRLA.reg |= seren_bit;
 
   return true;
 }
