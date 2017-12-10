@@ -1,8 +1,6 @@
 #include "Adafruit_ZeroPDM.h"
-#include <Adafruit_NeoPixel.h>
-#include <SPI.h>
 
-#define SAMPLERATE_HZ 32000
+#define SAMPLERATE_HZ 22000
 #define DECIMATION    64
 
 // Create PDM receiver object, with Clock and Data pins used (not all pins available)

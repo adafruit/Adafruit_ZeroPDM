@@ -52,6 +52,8 @@ public:
   // Read a single sample from the I2S subsystem.  Will wait until the I2S
   // hardware is ready to receive the sample.
   uint32_t read(void);
+
+  uint8_t getSerializer(void) { return _i2sserializer; };
   bool read(uint32_t *buffer, int bufsiz);
 
 private:
