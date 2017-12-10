@@ -78,10 +78,9 @@ public:
 private:
   int _clk, _data;
   uint32_t _clk_pin, _clk_mux, _data_pin, _data_mux;
-  i2s_serializer _i2sserializer;
-  i2s_clock_unit _i2sclock;
-  gclk_generator _gclk;
-  struct i2s_module _i2s_instance;
+  uint8_t _i2sserializer;
+  uint8_t _i2sclock;
+  uint8_t _gclk;
 
   I2s *_hw;
 };

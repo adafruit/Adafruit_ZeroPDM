@@ -239,7 +239,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   struct i2s_clock_unit_config i2s_clock_instance;
   i2s_clock_unit_get_config_defaults(&i2s_clock_instance);
   // Configure source GCLK for I2S peripheral.
-  i2s_clock_instance.clock.gclk_src = _gclk;
+  i2s_clock_instance.clock.gclk_src = (enum gclk_generator)_gclk;
   // Disable MCK output and set SCK to MCK value.
   i2s_clock_instance.clock.mck_src = I2S_MASTER_CLOCK_SOURCE_GCLK;
   i2s_clock_instance.clock.mck_out_enable = false;
@@ -398,7 +398,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     
     
     // Configure clock unit to use with serializer, and set serializer as an output.
-    i2s_serializer_instance.clock_unit = _i2sclock;
+    i2s_serializer_instance.clock_unit = (i2s_clock_unit)_i2sclock;
     if (stereo) {
       i2s_serializer_instance.mode = I2S_SERIALIZER_PDM2; //Serializer is used to receive PDM data on each clock edge
     } else {
@@ -479,8 +479,8 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     }
     
     /* Save configure */
-    _i2s_instance.serializer[_i2sserializer].mode = i2s_serializer_instance.mode;
-    _i2s_instance.serializer[_i2sserializer].data_size = i2s_serializer_instance.data_size;
+    // _i2s_instance.serializer[_i2sserializer].mode = i2s_serializer_instance.mode;
+    // _i2s_instance.serializer[_i2sserializer].data_size = i2s_serializer_instance.data_size;
   }
   /* Enable everything configured above. */
   
@@ -531,7 +531,9 @@ bool Adafruit_ZeroPDM::read(uint32_t *buffer, int bufsiz) {
   // This will wait for the I2S hardware to be ready to send the byte.
   // Write the sample byte to the I2S data register.
   // This will wait for the I2S hardware to be ready to receive the byte.
-  status_code stat = i2s_serializer_read_buffer_wait(&_i2s_instance, _i2sserializer, buffer, bufsiz);
+  //status_code stat = i2s_serializer_read_buffer_wait(&_i2s_instance, _i2sserializer, buffer, bufsiz);
 
-  return (stat == STATUS_OK); // anything other than OK is a problem
+  //return (stat == STATUS_OK); // anything other than OK is a problem
+
+  return false;
 }
