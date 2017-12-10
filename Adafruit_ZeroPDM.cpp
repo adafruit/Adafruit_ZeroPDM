@@ -135,7 +135,8 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   end();
 
 
-  // Set the GCLK generator config and enable it.
+  /******************************* Set the GCLK generator config and enable it. *************/
+
   // replace "system_gclk_gen_set_config(_gclk, &gclk_generator);" with:
   {
     /* Cache new register configurations to minimize sync requirements. */
@@ -178,50 +179,43 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
       }  
     }
     
-    while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
-    
     noInterrupts();  // cpu_irq_enter_critical();
 
-    /* Select the correct generator */
-    *((uint8_t*)&GCLK->GENDIV.reg) = _gclk;
-    
-    /* Write the new generator configuration */
+
     while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
-    GCLK->GENDIV.reg  = new_gendiv_config;
+    *((uint8_t*)&GCLK->GENDIV.reg) = _gclk;   /* Select the correct generator */
+
+    while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
+    GCLK->GENDIV.reg  = new_gendiv_config;    /* Write the new generator configuration */
     
     while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
     GCLK->GENCTRL.reg = new_genctrl_config | (GCLK->GENCTRL.reg & GCLK_GENCTRL_GENEN);
+
+    // Replace "system_gclk_gen_enable(_gclk);" with:
+
+    while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
+    *((uint8_t*)&GCLK->GENCTRL.reg) = _gclk;          /* Select the requested generator */
+
+    while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
+    GCLK->GENCTRL.reg |= GCLK_GENCTRL_GENEN;          /* Enable generator */
     
     interrupts();  // cpu_irq_leave_critical();
   }
   
-  // Replace "system_gclk_gen_enable(_gclk);" with:
-  {
-    while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
-    noInterrupts();  // cpu_irq_enter_critical();
-    /* Select the requested generator */
-    *((uint8_t*)&GCLK->GENCTRL.reg) = _gclk;
-    while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
-    /* Enable generator */
-    GCLK->GENCTRL.reg |= GCLK_GENCTRL_GENEN;
-    interrupts();  // cpu_irq_leave_critical();
-  }
-
-  // Configure I2S clock.
+  /******************************* Configure I2S clock *************/
   {
     /* Status check */
     /* Busy ? */
     if (_hw->SYNCBUSY.reg & (I2S_SYNCBUSY_CKEN0 << _i2sclock)) {
-      //return STATUS_BUSY;
-      return false;
+      return false;           //return STATUS_BUSY;
     }
     /* Already enabled ? */
     if (_hw->CTRLA.reg & (I2S_CTRLA_CKEN0 << _i2sclock)) {
-      //return STATUS_ERR_DENIED;
-      return false;
+     
+      return false;           //return STATUS_ERR_DENIED;
     }
     
-    /****************************************************** Initialize Clock Unit */
+    /***************************** Initialize Clock Unit *************/
     uint32_t clkctrl = 
       // I2S_CLKCTRL_MCKOUTINV | // mck out not inverted
       // I2S_CLKCTRL_SCKOUTINV | // sck out not inverted
@@ -249,13 +243,46 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     
     /* Select general clock source */
     const uint8_t i2s_gclk_ids[2] = {I2S_GCLK_ID_0, I2S_GCLK_ID_1};
-    struct system_gclk_chan_config gclk_chan_config;
-    system_gclk_chan_get_config_defaults(&gclk_chan_config);
+    //struct system_gclk_chan_config gclk_chan_config;
+    //system_gclk_chan_get_config_defaults(&gclk_chan_config);
 
-    gclk_chan_config.source_generator = (enum gclk_generator)_gclk;
-    system_gclk_chan_set_config(i2s_gclk_ids[_i2sclock], &gclk_chan_config);
-    system_gclk_chan_enable(i2s_gclk_ids[_i2sclock]);
+    //gclk_chan_config.source_generator = (enum gclk_generator)_gclk;
+
+    //system_gclk_chan_set_config(i2s_gclk_ids[_i2sclock], &gclk_chan_config);
+    /* Cache the new config to reduce sync requirements */
+    uint32_t new_clkctrl_config = (i2s_gclk_ids[_i2sclock] << GCLK_CLKCTRL_ID_Pos);
+
+    /* Select the desired generic clock generator */
+    new_clkctrl_config |= _gclk << GCLK_CLKCTRL_GEN_Pos;
+
+    /* Disable generic clock channel */
+    //system_gclk_chan_disable(i2s_gclk_ids[_i2sclock]);
+    noInterrupts();
+    /* Select the requested generator channel */
+    *((uint8_t*)&GCLK->CLKCTRL.reg) = i2s_gclk_ids[_i2sclock];
+
+    /* Switch to known-working source so that the channel can be disabled */
+    uint32_t prev_gen_id = GCLK->CLKCTRL.bit.GEN;
+    GCLK->CLKCTRL.bit.GEN = 0;
+
+    /* Disable the generic clock */
+    GCLK->CLKCTRL.reg &= ~GCLK_CLKCTRL_CLKEN;
+    while (GCLK->CLKCTRL.reg & GCLK_CLKCTRL_CLKEN); /* Wait for clock to become disabled */
+
+    /* Restore previous configured clock generator */
+    GCLK->CLKCTRL.bit.GEN = prev_gen_id;
+    interrupts();
+
+    /* Write the new configuration */
+    GCLK->CLKCTRL.reg = new_clkctrl_config;
     
+
+    //system_gclk_chan_enable(i2s_gclk_ids[_i2sclock]);
+    noInterrupts();
+    *((uint8_t*)&GCLK->CLKCTRL.reg) = i2s_gclk_ids[_i2sclock];   /* Select the requested generator channel */
+    GCLK->CLKCTRL.reg |= GCLK_CLKCTRL_CLKEN;                     /* Enable the generic clock */
+    interrupts();
+
     /* Initialize pins */
     pinPeripheral(_clk, (EPioType)_clk_mux);
   }
