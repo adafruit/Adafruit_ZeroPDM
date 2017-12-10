@@ -181,7 +181,6 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     
     noInterrupts();  // cpu_irq_enter_critical();
 
-
     while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
     *((uint8_t*)&GCLK->GENDIV.reg) = _gclk;   /* Select the correct generator */
 
@@ -243,12 +242,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     
     /* Select general clock source */
     const uint8_t i2s_gclk_ids[2] = {I2S_GCLK_ID_0, I2S_GCLK_ID_1};
-    //struct system_gclk_chan_config gclk_chan_config;
-    //system_gclk_chan_get_config_defaults(&gclk_chan_config);
 
-    //gclk_chan_config.source_generator = (enum gclk_generator)_gclk;
-
-    //system_gclk_chan_set_config(i2s_gclk_ids[_i2sclock], &gclk_chan_config);
     /* Cache the new config to reduce sync requirements */
     uint32_t new_clkctrl_config = (i2s_gclk_ids[_i2sclock] << GCLK_CLKCTRL_ID_Pos);
 
@@ -256,8 +250,8 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     new_clkctrl_config |= _gclk << GCLK_CLKCTRL_GEN_Pos;
 
     /* Disable generic clock channel */
-    //system_gclk_chan_disable(i2s_gclk_ids[_i2sclock]);
     noInterrupts();
+
     /* Select the requested generator channel */
     *((uint8_t*)&GCLK->CLKCTRL.reg) = i2s_gclk_ids[_i2sclock];
 
@@ -271,14 +265,11 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
     /* Restore previous configured clock generator */
     GCLK->CLKCTRL.bit.GEN = prev_gen_id;
-    interrupts();
 
     /* Write the new configuration */
     GCLK->CLKCTRL.reg = new_clkctrl_config;
     
-
-    //system_gclk_chan_enable(i2s_gclk_ids[_i2sclock]);
-    noInterrupts();
+    // enable it
     *((uint8_t*)&GCLK->CLKCTRL.reg) = i2s_gclk_ids[_i2sclock];   /* Select the requested generator channel */
     GCLK->CLKCTRL.reg |= GCLK_CLKCTRL_CLKEN;                     /* Enable the generic clock */
     interrupts();
@@ -287,58 +278,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     pinPeripheral(_clk, (EPioType)_clk_mux);
   }
 
-  // Configure I2S serializer.
-  struct i2s_serializer_config i2s_serializer_instance;
-  // Replace "i2s_serializer_get_config_defaults(&i2s_serializer_instance);" with:
-  {
-    i2s_serializer_instance.loop_back = false;
-    i2s_serializer_instance.mono_mode = false;
-    i2s_serializer_instance.disable_data_slot[0] = false;
-    i2s_serializer_instance.disable_data_slot[1] = false;
-    i2s_serializer_instance.disable_data_slot[2] = false;
-    i2s_serializer_instance.disable_data_slot[3] = false;
-    i2s_serializer_instance.disable_data_slot[4] = false;
-    i2s_serializer_instance.disable_data_slot[5] = false;
-    i2s_serializer_instance.disable_data_slot[6] = false;
-    i2s_serializer_instance.disable_data_slot[7] = false;
-    i2s_serializer_instance.transfer_lsb_first = false;
-    i2s_serializer_instance.data_adjust_left_in_word = false;
-    i2s_serializer_instance.data_adjust_left_in_slot = true;
-    i2s_serializer_instance.data_size = I2S_DATA_SIZE_16BIT;
-    i2s_serializer_instance.bit_padding = I2S_BIT_PADDING_0;
-    i2s_serializer_instance.data_padding = I2S_DATA_PADDING_0;
-    i2s_serializer_instance.dma_usage = I2S_DMA_USE_SINGLE_CHANNEL_FOR_ALL;
-    i2s_serializer_instance.clock_unit = I2S_CLOCK_UNIT_0;
-    i2s_serializer_instance.line_default_state = I2S_LINE_DEFAULT_0;
-    i2s_serializer_instance.mode = I2S_SERIALIZER_TRANSMIT;
-    i2s_serializer_instance.data_pin.enable = false;
-    i2s_serializer_instance.data_pin.gpio = 0;
-    i2s_serializer_instance.data_pin.mux = 0;
-    
-    
-    // Configure clock unit to use with serializer, and set serializer as an output.
-    i2s_serializer_instance.clock_unit = (i2s_clock_unit)_i2sclock;
-    if (stereo) {
-      i2s_serializer_instance.mode = I2S_SERIALIZER_PDM2; //Serializer is used to receive PDM data on each clock edge
-    } else {
-      i2s_serializer_instance.mode = I2S_SERIALIZER_RECEIVE; // act like I2S
-    }
-    // Configure serializer data size.
-    i2s_serializer_instance.data_size = I2S_DATA_SIZE_32BIT; // anything other than 32 bits is ridiculous to manage, force this to be 32
-    // Enable SD pin.  See Adafruit_ZeroI2S.h for default pin value.
-    i2s_serializer_instance.data_pin.enable = true;
-    i2s_serializer_instance.data_pin.gpio = _data_pin;
-    i2s_serializer_instance.data_pin.mux = _data_mux;
-  }
-
-  /* Replace:
-  "res = i2s_serializer_set_config(&_i2s_instance, _i2sserializer, &i2s_serializer_instance);
-   if (res != STATUS_OK) {
-     DEBUG_PRINT("i2s_serializer_set_config failed with result: "); DEBUG_PRINTLN(res);
-     return false;
-   }"
-  with:
-  */
+  /***************************** Configure I2S serializer *************/
   {
     /* Status check */
     /* Busy ? */
@@ -355,43 +295,51 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     
     /* Initialize Serializer */
     uint32_t serctrl =
-      (i2s_serializer_instance.loop_back ? I2S_SERCTRL_RXLOOP : 0) |
-      (i2s_serializer_instance.dma_usage ? I2S_SERCTRL_DMA : 0) |
-      (i2s_serializer_instance.mono_mode ? I2S_SERCTRL_MONO : 0) |
-      (i2s_serializer_instance.disable_data_slot[7] ? I2S_SERCTRL_SLOTDIS7 : 0) |
-      (i2s_serializer_instance.disable_data_slot[6] ? I2S_SERCTRL_SLOTDIS6 : 0) |
-      (i2s_serializer_instance.disable_data_slot[5] ? I2S_SERCTRL_SLOTDIS5 : 0) |
-      (i2s_serializer_instance.disable_data_slot[4] ? I2S_SERCTRL_SLOTDIS4 : 0) |
-      (i2s_serializer_instance.disable_data_slot[3] ? I2S_SERCTRL_SLOTDIS3 : 0) |
-      (i2s_serializer_instance.disable_data_slot[2] ? I2S_SERCTRL_SLOTDIS2 : 0) |
-      (i2s_serializer_instance.disable_data_slot[1] ? I2S_SERCTRL_SLOTDIS1 : 0) |
-      (i2s_serializer_instance.disable_data_slot[0] ? I2S_SERCTRL_SLOTDIS0 : 0) |
-      (i2s_serializer_instance.transfer_lsb_first ? I2S_SERCTRL_BITREV : 0) |
-      (i2s_serializer_instance.data_adjust_left_in_word ? I2S_SERCTRL_WORDADJ : 0) |
-      (i2s_serializer_instance.data_adjust_left_in_slot ? I2S_SERCTRL_SLOTADJ : 0) |
-      (i2s_serializer_instance.data_padding ? I2S_SERCTRL_TXSAME : 0);
+      // I2S_SERCTRL_RXLOOP |    // Dont use loopback mode
+      // I2S_SERCTRL_DMA    |    // Single DMA channel for all I2S channels
+      // I2S_SERCTRL_MONO   |    // Dont use MONO mode
+      // I2S_SERCTRL_SLOTDIS7 |  // Dont have any slot disabling
+      // I2S_SERCTRL_SLOTDIS6 |
+      // I2S_SERCTRL_SLOTDIS5 |
+      // I2S_SERCTRL_SLOTDIS4 |
+      // I2S_SERCTRL_SLOTDIS3 |
+      // I2S_SERCTRL_SLOTDIS2 |
+      // I2S_SERCTRL_SLOTDIS1 |
+      // I2S_SERCTRL_SLOTDIS0 |
+      // I2S_SERCTRL_BITREV   |  // Do not transfer LSB first (MSB first!)
+      // I2S_SERCTRL_WORDADJ  |  // Data NOT left in word
+      I2S_SERCTRL_SLOTADJ     |  // Data is left in slot
+      // I2S_SERCTRL_TXSAME   |  // Pad 0 on underrun
+      0;
     
-    if (i2s_serializer_instance.clock_unit < I2S_CLOCK_UNIT_N) {
-      serctrl |= (i2s_serializer_instance.clock_unit ? I2S_SERCTRL_CLKSEL : 0);
+    // Configure clock unit to use with serializer, and set serializer as an output.
+    if (_i2sclock < 2) {
+      serctrl |= (_i2sclock ? I2S_SERCTRL_CLKSEL : 0);
     } else {
-      //return STATUS_ERR_INVALID_ARG;
-      return false;
+      return false;       //return STATUS_ERR_INVALID_ARG;
     }
+    if (stereo) {
+      serctrl |= I2S_SERCTRL_SERMODE(I2S_SERIALIZER_PDM2); //Serializer is used to receive PDM data on each clock edge
+    } else {
+      serctrl |= I2S_SERCTRL_SERMODE(I2S_SERIALIZER_RECEIVE); // act like I2S
+    }
+
+    // Configure serializer data size.
+    serctrl |=  I2S_SERCTRL_DATASIZE(I2S_DATA_SIZE_32BIT);  // anything other than 32 bits is ridiculous to manage, force this to be 32
     
-    serctrl |=
-      I2S_SERCTRL_SERMODE(i2s_serializer_instance.mode) |
-      I2S_SERCTRL_TXDEFAULT(i2s_serializer_instance.line_default_state) |
-      I2S_SERCTRL_DATASIZE(i2s_serializer_instance.data_size) |
-      I2S_SERCTRL_EXTEND(i2s_serializer_instance.bit_padding);
-    
+    serctrl |=  I2S_SERCTRL_TXDEFAULT(0) | /** Output default value is 0 */
+      I2S_SERCTRL_EXTEND(0);  /** Padding 0 in case of under-run */
+   
     /* Write Serializer configuration */
     _hw->SERCTRL[_i2sserializer].reg = serctrl;
     
     /* Initialize pins */
+    // Enable SD pin.  See Adafruit_ZeroI2S.h for default pin value.
     pinPeripheral(_data, (EPioType)_data_mux);
   }
-  /* Enable everything configured above. */
-  
+
+  /***************************** Enable everything configured above *************/
+
   // Replace "i2s_enable(&_i2s_instance);" with:
   while (_hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE);  // Sync wait
   _hw->CTRLA.reg |= I2S_SYNCBUSY_ENABLE;
