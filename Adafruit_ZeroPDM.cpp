@@ -134,22 +134,6 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   //replace "i2s_disable(&_i2s_instance);" with:
   end();
 
-  // Configure the GCLK generator that will drive the I2S clocks.  This clock
-  // will run at the SCK frequency by dividing the 48mhz main cpu clock.
-  struct system_gclk_gen_config gclk_generator;
-
-  // Load defaults for the clock generator.
-  // Replace "system_gclk_gen_get_config_defaults(&gclk_generator);" with:
-  gclk_generator.division_factor    = 1;
-  gclk_generator.high_when_disabled = false;
-  gclk_generator.source_clock       = GCLK_SOURCE_OSC8M;
-  gclk_generator.run_in_standby     = false;
-  gclk_generator.output_enable      = false;
-
-  // Set the clock generator to use the 48mhz main CPU clock and divide it down
-  // to the SCK frequency.
-  gclk_generator.source_clock = SYSTEM_CLOCK_SOURCE_DFLL;
-  gclk_generator.division_factor = F_CPU / (sampleRateHz*16); // 16 clocks for 16 stereo bits
 
   // Set the GCLK generator config and enable it.
   // replace "system_gclk_gen_set_config(_gclk, &gclk_generator);" with:
@@ -159,22 +143,15 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     uint32_t new_gendiv_config  = (_gclk << GCLK_GENDIV_ID_Pos);
     
     /* Select the requested source clock for the generator */
-    new_genctrl_config |= gclk_generator.source_clock << GCLK_GENCTRL_SRC_Pos;
-    
-    /* Configure the clock to be either high or low when disabled */
-    if (gclk_generator.high_when_disabled) {
-      new_genctrl_config |= GCLK_GENCTRL_OOV;
-    }
-    
-    /* Configure if the clock output to I/O pin should be enabled. */
-    if (gclk_generator.output_enable) {
-      new_genctrl_config |= GCLK_GENCTRL_OE;
-    }
+    // Set the clock generator to use the 48mhz main CPU clock and divide it down
+    // to the SCK frequency.
+    new_genctrl_config |= SYSTEM_CLOCK_SOURCE_DFLL  << GCLK_GENCTRL_SRC_Pos;
+    uint32_t division_factor = F_CPU / (sampleRateHz*16); // 16 clocks for 16 stereo bits
     
     /* Set division factor */
-    if (gclk_generator.division_factor > 1) {
+    if (division_factor > 1) {
       /* Check if division is a power of two */
-      if (((gclk_generator.division_factor & (gclk_generator.division_factor - 1)) == 0)) {
+      if (((division_factor & (division_factor - 1)) == 0)) {
 	/* Determine the index of the highest bit set to get the
 	 * division factor that must be loaded into the division
 	 * register */
@@ -182,7 +159,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 	uint32_t div2_count = 0;
 	
 	uint32_t mask;
-	for (mask = (1UL << 1); mask < gclk_generator.division_factor;
+	for (mask = (1UL << 1); mask < division_factor;
 	     mask <<= 1) {
 	  div2_count++;
 	}
@@ -194,16 +171,11 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 	/* Set integer division factor */
 	
 	new_gendiv_config  |=
-	  (gclk_generator.division_factor) << GCLK_GENDIV_DIV_Pos;
+	  (division_factor) << GCLK_GENDIV_DIV_Pos;
 	
 	/* Enable non-binary division with increased duty cycle accuracy */
 	new_genctrl_config |= GCLK_GENCTRL_IDC;
       }  
-    }
-
-    /* Enable or disable the clock in standby mode */
-    if (gclk_generator.run_in_standby) {
-      new_genctrl_config |= GCLK_GENCTRL_RUNSTDBY;
     }
     
     while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
@@ -249,7 +221,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
       return false;
     }
     
-    /* Initialize Clock Unit */
+    /****************************************************** Initialize Clock Unit */
     uint32_t clkctrl = 
       // I2S_CLKCTRL_MCKOUTINV | // mck out not inverted
       // I2S_CLKCTRL_SCKOUTINV | // sck out not inverted
@@ -264,10 +236,8 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
     clkctrl |= I2S_CLKCTRL_MCKOUTDIV(0);
     clkctrl |= I2S_CLKCTRL_MCKDIV(0);
-    
     clkctrl |= I2S_CLKCTRL_NBSLOTS(1);  // STEREO is '1' (subtract one)
     clkctrl |= I2S_CLKCTRL_FSWIDTH(0);  // Frame Sync (FS) Pulse is 1 Slot width
-
     if (stereo) {
       clkctrl |= I2S_CLKCTRL_SLOTSIZE(I2S_SLOT_SIZE_16_BIT);
     } else {
@@ -281,18 +251,13 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     const uint8_t i2s_gclk_ids[2] = {I2S_GCLK_ID_0, I2S_GCLK_ID_1};
     struct system_gclk_chan_config gclk_chan_config;
     system_gclk_chan_get_config_defaults(&gclk_chan_config);
+
     gclk_chan_config.source_generator = (enum gclk_generator)_gclk;
     system_gclk_chan_set_config(i2s_gclk_ids[_i2sclock], &gclk_chan_config);
     system_gclk_chan_enable(i2s_gclk_ids[_i2sclock]);
     
     /* Initialize pins */
-    {
-      struct system_pinmux_config pin_config;
-      system_pinmux_get_config_defaults(&pin_config);
-      
-      pin_config.mux_position = _clk_mux;
-      system_pinmux_pin_set_config(_clk_pin, &pin_config);
-    }
+    pinPeripheral(_clk, (EPioType)_clk_mux);
   }
 
   // Configure I2S serializer.
@@ -396,18 +361,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     _hw->SERCTRL[_i2sserializer].reg = serctrl;
     
     /* Initialize pins */
-    {
-      struct system_pinmux_config pin_config;
-      system_pinmux_get_config_defaults(&pin_config);
-      if (i2s_serializer_instance.data_pin.enable) {
-	pin_config.mux_position = i2s_serializer_instance.data_pin.mux;
-	system_pinmux_pin_set_config(i2s_serializer_instance.data_pin.gpio, &pin_config);
-      }
-    }
-    
-    /* Save configure */
-    // _i2s_instance.serializer[_i2sserializer].mode = i2s_serializer_instance.mode;
-    // _i2s_instance.serializer[_i2sserializer].data_size = i2s_serializer_instance.data_size;
+    pinPeripheral(_data, (EPioType)_data_mux);
   }
   /* Enable everything configured above. */
   

@@ -26,6 +26,7 @@
 #define ADAFRUIT_ZEROPDM_H
 
 #include <Arduino.h>
+#include "wiring_private.h"
 #include <sam.h>
 #include <i2s.h>
 
