@@ -91,19 +91,40 @@ bool Adafruit_ZeroPDM::begin(void) {
   }
 
   // Initialize I2S module from the ASF.
-  status_code res = i2s_init(&_i2s_instance, I2S);
-  if (res != STATUS_OK) {
-    DEBUG_PRINT("i2s_init failed with result: "); DEBUG_PRINTLN(res);
-    return false;
+  // replace "status_code res = i2s_init(&_i2s_instance, I2S);
+  //  if (res != STATUS_OK) {
+  //  DEBUG_PRINT("i2s_init failed with result: "); DEBUG_PRINTLN(res);
+  //  return false;
+  // }" with:
+
+  /* Enable the user interface clock in the PM */
+  //system_apb_clock_set_mask(SYSTEM_CLOCK_APB_APBC, PM_APBCMASK_I2S);
+  PM->APBCMASK.reg |= PM_APBCMASK_I2S;
+
+  /* Status check */
+  uint32_t ctrla = I2S->CTRLA.reg;
+  if (ctrla & I2S_CTRLA_ENABLE) {
+    if (ctrla & (I2S_CTRLA_SEREN1 |
+		 I2S_CTRLA_SEREN0 | I2S_CTRLA_CKEN1 | I2S_CTRLA_CKEN0)) {
+      //return STATUS_BUSY;
+      return false;
+    } else {
+      //return STATUS_ERR_DENIED;
+      return false;
+    }
   }
+
+  /* Initialize module */
+  _hw = I2S;
+
   return true;
 }
 
 void Adafruit_ZeroPDM::end(void) {
   //replace "i2s_disable(&_i2s_instance);" with:
   
-  while (_i2s_instance.hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE); // Sync wait
-  _i2s_instance.hw->CTRLA.reg &= ~I2S_SYNCBUSY_ENABLE;
+  while (_hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE); // Sync wait
+  _hw->CTRLA.reg &= ~I2S_SYNCBUSY_ENABLE;
 }
 
 bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
@@ -160,10 +181,102 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   i2s_clock_instance.sck_pin.gpio = _clk_pin;
   i2s_clock_instance.sck_pin.mux = _clk_mux;
   // Set clock configuration.
+
+  /*
   status_code res = i2s_clock_unit_set_config(&_i2s_instance, _i2sclock, &i2s_clock_instance);
   if (res != STATUS_OK) {
     DEBUG_PRINT("i2s_clock_unit_set_config failed with result: "); DEBUG_PRINTLN(res);
     return false;
+  }
+  */
+
+  /* Status check */
+  /* Busy ? */
+  if (_hw->SYNCBUSY.reg & (I2S_SYNCBUSY_CKEN0 << _i2sclock)) {
+    //return STATUS_BUSY;
+    return false;
+  }
+  /* Already enabled ? */
+  if (_hw->CTRLA.reg & (I2S_CTRLA_CKEN0 << _i2sclock)) {
+    //return STATUS_ERR_DENIED;
+    return false;
+  }
+
+  /* Parameter check */
+  if (i2s_clock_instance.clock.mck_src && i2s_clock_instance.clock.mck_out_enable) {
+    //return STATUS_ERR_INVALID_ARG;
+    return false;
+  }
+
+  /* Initialize Clock Unit */
+  uint32_t clkctrl =
+    (i2s_clock_instance.clock.mck_out_invert ? I2S_CLKCTRL_MCKOUTINV : 0) |
+    (i2s_clock_instance.clock.sck_out_invert ? I2S_CLKCTRL_SCKOUTINV : 0) |
+    (i2s_clock_instance.frame.frame_sync.invert_out ? I2S_CLKCTRL_FSOUTINV : 0) |
+    (i2s_clock_instance.clock.mck_out_enable ? I2S_CLKCTRL_MCKEN : 0) |
+    (i2s_clock_instance.clock.mck_src ? I2S_CLKCTRL_MCKSEL : 0) |
+    (i2s_clock_instance.clock.sck_src ? I2S_CLKCTRL_SCKSEL : 0) |
+    (i2s_clock_instance.frame.frame_sync.invert_use ? I2S_CLKCTRL_FSINV : 0) |
+    (i2s_clock_instance.frame.frame_sync.source ? I2S_CLKCTRL_FSSEL : 0) |
+    (i2s_clock_instance.frame.data_delay ? I2S_CLKCTRL_BITDELAY : 0);
+
+  uint8_t div_val = i2s_clock_instance.clock.mck_out_div;
+  if ((div_val > 0x21) || (div_val == 0)) {
+    //return STATUS_ERR_INVALID_ARG;
+    return false;
+  } else {
+    div_val --;
+  }
+  clkctrl |= I2S_CLKCTRL_MCKOUTDIV(div_val);
+
+  div_val = i2s_clock_instance.clock.sck_div;
+  if ((div_val > 0x21) || (div_val == 0)) {
+    //return STATUS_ERR_INVALID_ARG;
+    return false;
+  } else {
+    div_val --;
+  }
+  clkctrl |= I2S_CLKCTRL_MCKDIV(div_val);
+
+  uint8_t number_slots = i2s_clock_instance.frame.number_slots;
+  if (number_slots > 8) {
+    //return STATUS_ERR_INVALID_ARG;
+    return false;
+  } else if (number_slots > 0) {
+    number_slots --;
+  }
+  clkctrl |=
+    I2S_CLKCTRL_NBSLOTS(number_slots) |
+    I2S_CLKCTRL_FSWIDTH(i2s_clock_instance.frame.frame_sync.width) |
+    I2S_CLKCTRL_SLOTSIZE(i2s_clock_instance.frame.slot_size);
+  
+  /* Write clock unit configurations */
+  _hw->CLKCTRL[_i2sclock].reg = clkctrl;
+
+  /* Select general clock source */
+  const uint8_t i2s_gclk_ids[2] = {I2S_GCLK_ID_0, I2S_GCLK_ID_1};
+  struct system_gclk_chan_config gclk_chan_config;
+  system_gclk_chan_get_config_defaults(&gclk_chan_config);
+  gclk_chan_config.source_generator = i2s_clock_instance.clock.gclk_src;
+  system_gclk_chan_set_config(i2s_gclk_ids[_i2sclock], &gclk_chan_config);
+  system_gclk_chan_enable(i2s_gclk_ids[_i2sclock]);
+
+  /* Initialize pins */
+  {
+    struct system_pinmux_config pin_config;
+    system_pinmux_get_config_defaults(&pin_config);
+    if (i2s_clock_instance.mck_pin.enable) {
+      pin_config.mux_position = i2s_clock_instance.mck_pin.mux;
+      system_pinmux_pin_set_config(i2s_clock_instance.mck_pin.gpio, &pin_config);
+    }
+    if (i2s_clock_instance.sck_pin.enable) {
+      pin_config.mux_position = i2s_clock_instance.sck_pin.mux;
+      system_pinmux_pin_set_config(i2s_clock_instance.sck_pin.gpio, &pin_config);
+    }
+    if (i2s_clock_instance.fs_pin.enable) {
+      pin_config.mux_position = i2s_clock_instance.fs_pin.mux;
+      system_pinmux_pin_set_config(i2s_clock_instance.fs_pin.gpio, &pin_config);
+    }
   }
 
   // Configure I2S serializer.
@@ -210,24 +323,25 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   i2s_serializer_instance.data_pin.mux = _data_mux;
   
 
-  /*
-  res = i2s_serializer_set_config(&_i2s_instance, _i2sserializer, &i2s_serializer_instance);
+  /* Replace:
+  "res = i2s_serializer_set_config(&_i2s_instance, _i2sserializer, &i2s_serializer_instance);
   if (res != STATUS_OK) {
     DEBUG_PRINT("i2s_serializer_set_config failed with result: "); DEBUG_PRINTLN(res);
     return false;
-  }
+  }"
+  with:
   */
 
 
   /* Status check */
   /* Busy ? */
-  while (_i2s_instance.hw->SYNCBUSY.reg & ((I2S_SYNCBUSY_SEREN0 | I2S_SYNCBUSY_DATA0) << _i2sserializer)) {
+  while (_hw->SYNCBUSY.reg & ((I2S_SYNCBUSY_SEREN0 | I2S_SYNCBUSY_DATA0) << _i2sserializer)) {
     //return STATUS_BUSY;
     return false;
   }
 
   /* Already enabled ? */
-  if (_i2s_instance.hw->CTRLA.reg & (I2S_CTRLA_CKEN0 << _i2sserializer)) {
+  if (_hw->CTRLA.reg & (I2S_CTRLA_CKEN0 << _i2sserializer)) {
     // return STATUS_ERR_DENIED;
     return false;
   }
@@ -264,14 +378,16 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     I2S_SERCTRL_EXTEND(i2s_serializer_instance.bit_padding);
   
   /* Write Serializer configuration */
-  _i2s_instance.hw->SERCTRL[_i2sserializer].reg = serctrl;
+  _hw->SERCTRL[_i2sserializer].reg = serctrl;
 
   /* Initialize pins */
-  struct system_pinmux_config pin_config;
-  system_pinmux_get_config_defaults(&pin_config);
-  if (i2s_serializer_instance.data_pin.enable) {
-    pin_config.mux_position = i2s_serializer_instance.data_pin.mux;
-    system_pinmux_pin_set_config(i2s_serializer_instance.data_pin.gpio, &pin_config);
+  {
+    struct system_pinmux_config pin_config;
+    system_pinmux_get_config_defaults(&pin_config);
+    if (i2s_serializer_instance.data_pin.enable) {
+      pin_config.mux_position = i2s_serializer_instance.data_pin.mux;
+      system_pinmux_pin_set_config(i2s_serializer_instance.data_pin.gpio, &pin_config);
+    }
   }
 
   /* Save configure */
@@ -281,18 +397,18 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   /* Enable everything configured above. */
 
   // Replace "i2s_enable(&_i2s_instance);" with:
-  while (_i2s_instance.hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE);  // Sync wait
-  _i2s_instance.hw->CTRLA.reg |= I2S_SYNCBUSY_ENABLE;
+  while (_hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE);  // Sync wait
+  _hw->CTRLA.reg |= I2S_SYNCBUSY_ENABLE;
 
   // Replace "i2s_clock_unit_enable(&_i2s_instance, _i2sclock);" with:
   uint32_t cken_bit = I2S_CTRLA_CKEN0 << _i2sclock;
-  while (_i2s_instance.hw->SYNCBUSY.reg & cken_bit); // Sync wait
-  _i2s_instance.hw->CTRLA.reg |= cken_bit;
+  while (_hw->SYNCBUSY.reg & cken_bit); // Sync wait
+  _hw->CTRLA.reg |= cken_bit;
 
   // Replace "i2s_serializer_enable(&_i2s_instance, _i2sserializer);" with:
   uint32_t seren_bit = I2S_CTRLA_SEREN0 << _i2sserializer;
-  while (_i2s_instance.hw->SYNCBUSY.reg & seren_bit); // Sync wait
-  _i2s_instance.hw->CTRLA.reg |= seren_bit;
+  while (_hw->SYNCBUSY.reg & seren_bit); // Sync wait
+  _hw->CTRLA.reg |= seren_bit;
 
   return true;
 }
@@ -306,16 +422,16 @@ uint32_t Adafruit_ZeroPDM::read(void) {
   uint32_t sync_bit, ready_bit;
   uint32_t data;
   ready_bit = I2S_INTFLAG_RXRDY0 << _i2sserializer;
-  while (!(_i2s_instance.hw->INTFLAG.reg & ready_bit)) {
+  while (!(_hw->INTFLAG.reg & ready_bit)) {
     /* Wait until ready to transmit */
   }
   sync_bit = I2S_SYNCBUSY_DATA0 << _i2sserializer;
-  while (_i2s_instance.hw->SYNCBUSY.reg & sync_bit) {
+  while (_hw->SYNCBUSY.reg & sync_bit) {
     /* Wait sync */
   }
   /* Read data */
-  data = _i2s_instance.hw->DATA[_i2sserializer].reg;
-  _i2s_instance.hw->INTFLAG.reg = ready_bit;
+  data = _hw->DATA[_i2sserializer].reg;
+  _hw->INTFLAG.reg = ready_bit;
   return data;
 }
 

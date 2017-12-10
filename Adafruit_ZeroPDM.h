@@ -82,6 +82,8 @@ private:
   i2s_clock_unit _i2sclock;
   gclk_generator _gclk;
   struct i2s_module _i2s_instance;
+
+  I2s *_hw;
 };
 
 
