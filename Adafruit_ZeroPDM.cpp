@@ -302,7 +302,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
       // I2S_SERCTRL_SLOTDIS2 |
       // I2S_SERCTRL_SLOTDIS1 |
       // I2S_SERCTRL_SLOTDIS0 |
-      // I2S_SERCTRL_BITREV   |  // Do not transfer LSB first (MSB first!)
+      I2S_SERCTRL_BITREV   |  // Do not transfer LSB first (MSB first!)
       // I2S_SERCTRL_WORDADJ  |  // Data NOT left in word
       I2S_SERCTRL_SLOTADJ     |  // Data is left in slot
       // I2S_SERCTRL_TXSAME   |  // Pad 0 on underrun
