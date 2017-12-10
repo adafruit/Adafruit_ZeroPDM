@@ -121,8 +121,6 @@ bool Adafruit_ZeroPDM::begin(void) {
 }
 
 void Adafruit_ZeroPDM::end(void) {
-  //replace "i2s_disable(&_i2s_instance);" with:
-  
   while (_hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE); // Sync wait
   _hw->CTRLA.reg &= ~I2S_SYNCBUSY_ENABLE;
 }
@@ -131,13 +129,10 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   // Convert bit per sample int into explicit ASF values.
 
   // Disable I2S while it is being reconfigured to prevent unexpected output.
-  //replace "i2s_disable(&_i2s_instance);" with:
   end();
 
 
   /******************************* Set the GCLK generator config and enable it. *************/
-
-  // replace "system_gclk_gen_set_config(_gclk, &gclk_generator);" with:
   {
     /* Cache new register configurations to minimize sync requirements. */
     uint32_t new_genctrl_config = (_gclk << GCLK_GENCTRL_ID_Pos);
@@ -146,7 +141,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     /* Select the requested source clock for the generator */
     // Set the clock generator to use the 48mhz main CPU clock and divide it down
     // to the SCK frequency.
-    new_genctrl_config |= SYSTEM_CLOCK_SOURCE_DFLL  << GCLK_GENCTRL_SRC_Pos;
+    new_genctrl_config |= GCLK_SOURCE_DFLL48M  << GCLK_GENCTRL_SRC_Pos;
     uint32_t division_factor = F_CPU / (sampleRateHz*16); // 16 clocks for 16 stereo bits
     
     /* Set division factor */
@@ -229,8 +224,8 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
     clkctrl |= I2S_CLKCTRL_MCKOUTDIV(0);
     clkctrl |= I2S_CLKCTRL_MCKDIV(0);
-    clkctrl |= I2S_CLKCTRL_NBSLOTS(1);  // STEREO is '1' (subtract one)
-    clkctrl |= I2S_CLKCTRL_FSWIDTH(0);  // Frame Sync (FS) Pulse is 1 Slot width
+    clkctrl |= I2S_CLKCTRL_NBSLOTS(1);  // STEREO is '1' (subtract one from #)
+    clkctrl |= I2S_CLKCTRL_FSWIDTH(I2S_FRAME_SYNC_WIDTH_SLOT);  // Frame Sync (FS) Pulse is 1 Slot width
     if (stereo) {
       clkctrl |= I2S_CLKCTRL_SLOTSIZE(I2S_SLOT_SIZE_16_BIT);
     } else {
@@ -272,6 +267,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     // enable it
     *((uint8_t*)&GCLK->CLKCTRL.reg) = i2s_gclk_ids[_i2sclock];   /* Select the requested generator channel */
     GCLK->CLKCTRL.reg |= GCLK_CLKCTRL_CLKEN;                     /* Enable the generic clock */
+
     interrupts();
 
     /* Initialize pins */
@@ -327,8 +323,8 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     // Configure serializer data size.
     serctrl |=  I2S_SERCTRL_DATASIZE(I2S_DATA_SIZE_32BIT);  // anything other than 32 bits is ridiculous to manage, force this to be 32
     
-    serctrl |=  I2S_SERCTRL_TXDEFAULT(0) | /** Output default value is 0 */
-      I2S_SERCTRL_EXTEND(0);  /** Padding 0 in case of under-run */
+    serctrl |=  I2S_SERCTRL_TXDEFAULT(I2S_LINE_DEFAULT_0) | /** Output default value is 0 */
+                I2S_SERCTRL_EXTEND(I2S_DATA_PADDING_0);     /** Padding 0 in case of under-run */
    
     /* Write Serializer configuration */
     _hw->SERCTRL[_i2sserializer].reg = serctrl;

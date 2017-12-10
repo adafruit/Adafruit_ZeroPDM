@@ -1,9 +1,8 @@
-#include "Adafruit_ASFcore.h"
 #include "Adafruit_ZeroPDM.h"
 #include <Adafruit_NeoPixel.h>
 #include <SPI.h>
 
-#define SAMPLERATE_HZ 44100
+#define SAMPLERATE_HZ 44000
 #define DECIMATION    64
 
 // Create PDM receiver object, with Clock and Data pins used (not all pins available)
@@ -16,10 +15,12 @@ Adafruit_ZeroPDM pdm = Adafruit_ZeroPDM(1, 4);  // Metro M0 or Arduino zero
 uint16_t sincfilter[DECIMATION] = {0, 2, 9, 21, 39, 63, 94, 132, 179, 236, 302, 379, 467, 565, 674, 792, 920, 1055, 1196, 1341, 1487, 1633, 1776, 1913, 2042, 2159, 2263, 2352, 2422, 2474, 2506, 2516, 2506, 2474, 2422, 2352, 2263, 2159, 2042, 1913, 1776, 1633, 1487, 1341, 1196, 1055, 920, 792, 674, 565, 467, 379, 302, 236, 179, 132, 94, 63, 39, 21, 9, 2, 0, 0};
 
 void setup() {
-  // Configure serial port.
-  SERIALPORT.begin(9600);
-  SERIALPORT.println("SAMD PDM Demo");
   pinMode(13, OUTPUT);
+  
+  // Configure serial port.
+  while (!SERIALPORT);
+  SERIALPORT.begin(115200);
+  SERIALPORT.println("SAMD PDM Demo");
 
   // Initialize the PDM/I2S receiver
   if (!pdm.begin()) {
@@ -29,7 +30,7 @@ void setup() {
   SERIALPORT.println("PDM initialized");
 
   // Configure PDM receiver, sample rate
-  if (!pdm.configure(SAMPLERATE_HZ * DECIMATION / 32)) {
+  if (!pdm.configure(SAMPLERATE_HZ * DECIMATION / 16, true)) {
     SERIALPORT.println("Failed to configure PDM");
     while (1);
   }
@@ -37,6 +38,7 @@ void setup() {
 
   // use analog output A0 @ full rez
   analogWriteResolution(10);
+  pinMode(A0, OUTPUT);
 }
 
 
@@ -63,7 +65,12 @@ void loop() {
 
   // since we wait for the samples from I2S peripheral, we dont need to delay, we will 'naturally'
   // wait the right amount of time between analog writes
-  analogWrite(A0, runningsum >> 6); // convert 16 bit -> 10 bit
+  //Serial.println(runningsum);
+
+  runningsum /= 64 ; // convert 16 bit -> 10 bit
+
+  // "echo" the analog value we've calculated out to A0
+  analogWrite(A0, runningsum);
 
   // note that we cannot print the the serial port fast enough to keep up!
 }
