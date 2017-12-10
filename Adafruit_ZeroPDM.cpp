@@ -35,7 +35,7 @@
 #endif
 
 
-Adafruit_ZeroPDM::Adafruit_ZeroPDM(int clockpin, int datapin, gclk_generator gclk):
+Adafruit_ZeroPDM::Adafruit_ZeroPDM(int clockpin, int datapin, uint8_t gclk):
   _gclk(gclk), _clk(clockpin), _data(datapin)  {
 
 }
@@ -208,7 +208,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     
     while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
     
-    cpu_irq_enter_critical();
+    noInterrupts();  // cpu_irq_enter_critical();
 
     /* Select the correct generator */
     *((uint8_t*)&GCLK->GENDIV.reg) = _gclk;
@@ -220,63 +220,22 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
     GCLK->GENCTRL.reg = new_genctrl_config | (GCLK->GENCTRL.reg & GCLK_GENCTRL_GENEN);
     
-    cpu_irq_leave_critical();
+    interrupts();  // cpu_irq_leave_critical();
   }
   
   // Replace "system_gclk_gen_enable(_gclk);" with:
   {
     while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
-    cpu_irq_enter_critical();
+    noInterrupts();  // cpu_irq_enter_critical();
     /* Select the requested generator */
     *((uint8_t*)&GCLK->GENCTRL.reg) = _gclk;
     while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
     /* Enable generator */
     GCLK->GENCTRL.reg |= GCLK_GENCTRL_GENEN;
-    cpu_irq_leave_critical();
+    interrupts();  // cpu_irq_leave_critical();
   }
 
   // Configure I2S clock.
-  struct i2s_clock_unit_config i2s_clock_instance;
-  i2s_clock_unit_get_config_defaults(&i2s_clock_instance);
-  // Configure source GCLK for I2S peripheral.
-  i2s_clock_instance.clock.gclk_src = (enum gclk_generator)_gclk;
-  // Disable MCK output and set SCK to MCK value.
-  i2s_clock_instance.clock.mck_src = I2S_MASTER_CLOCK_SOURCE_GCLK;
-  i2s_clock_instance.clock.mck_out_enable = false;
-  i2s_clock_instance.clock.sck_src = I2S_SERIAL_CLOCK_SOURCE_MCKDIV;
-  i2s_clock_instance.clock.sck_div = 1;
-  // Configure number of channels and slot size (based on bits per sample).
-  if (stereo) {
-    i2s_clock_instance.frame.number_slots = 2; // must be stereo for PDM2
-    i2s_clock_instance.frame.slot_size = I2S_SLOT_SIZE_16_BIT; // must be 16 bits (32 bit word containing stereo data)
-  } else {
-    i2s_clock_instance.frame.number_slots = 2;
-    i2s_clock_instance.frame.slot_size = I2S_SLOT_SIZE_32_BIT;
-  }
-
-  // Configure 1-bit delay in each frame
-  i2s_clock_instance.frame.data_delay = I2S_DATA_DELAY_0;
-  // Configure FS generation from SCK clock.
-  i2s_clock_instance.frame.frame_sync.source = I2S_FRAME_SYNC_SOURCE_SCKDIV;
-  // Configure FS change on full slot change (I2S default).
-  i2s_clock_instance.frame.frame_sync.width = I2S_FRAME_SYNC_WIDTH_SLOT;
-  // Disable MCK pin output and FS pin (unneeded)
-  i2s_clock_instance.mck_pin.enable = false;
-  i2s_clock_instance.fs_pin.enable = false;
-  // Enable SCK pin output
-  i2s_clock_instance.sck_pin.enable = true;
-  i2s_clock_instance.sck_pin.gpio = _clk_pin;
-  i2s_clock_instance.sck_pin.mux = _clk_mux;
-  // Set clock configuration.
-
-  /* Replace:
-  status_code res = i2s_clock_unit_set_config(&_i2s_instance, _i2sclock, &i2s_clock_instance);
-  if (res != STATUS_OK) {
-    DEBUG_PRINT("i2s_clock_unit_set_config failed with result: "); DEBUG_PRINTLN(res);
-    return false;
-  }
-  with:
-  */
   {
     /* Status check */
     /* Busy ? */
@@ -290,53 +249,30 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
       return false;
     }
     
-    /* Parameter check */
-    if (i2s_clock_instance.clock.mck_src && i2s_clock_instance.clock.mck_out_enable) {
-      //return STATUS_ERR_INVALID_ARG;
-      return false;
-    }
-    
     /* Initialize Clock Unit */
-    uint32_t clkctrl =
-      (i2s_clock_instance.clock.mck_out_invert ? I2S_CLKCTRL_MCKOUTINV : 0) |
-      (i2s_clock_instance.clock.sck_out_invert ? I2S_CLKCTRL_SCKOUTINV : 0) |
-      (i2s_clock_instance.frame.frame_sync.invert_out ? I2S_CLKCTRL_FSOUTINV : 0) |
-      (i2s_clock_instance.clock.mck_out_enable ? I2S_CLKCTRL_MCKEN : 0) |
-      (i2s_clock_instance.clock.mck_src ? I2S_CLKCTRL_MCKSEL : 0) |
-      (i2s_clock_instance.clock.sck_src ? I2S_CLKCTRL_SCKSEL : 0) |
-      (i2s_clock_instance.frame.frame_sync.invert_use ? I2S_CLKCTRL_FSINV : 0) |
-      (i2s_clock_instance.frame.frame_sync.source ? I2S_CLKCTRL_FSSEL : 0) |
-      (i2s_clock_instance.frame.data_delay ? I2S_CLKCTRL_BITDELAY : 0);
+    uint32_t clkctrl = 
+      // I2S_CLKCTRL_MCKOUTINV | // mck out not inverted
+      // I2S_CLKCTRL_SCKOUTINV | // sck out not inverted
+      // I2S_CLKCTRL_FSOUTINV |  // fs not inverted
+      // I2S_CLKCTRL_MCKEN |    // Disable MCK output
+      // I2S_CLKCTRL_MCKSEL |   // Disable MCK output
+      // I2S_CLKCTRL_SCKSEL |   // SCK source is GCLK
+      // I2S_CLKCTRL_FSINV |    // do not invert frame sync
+      // I2S_CLKCTRL_FSSEL |    // Configure FS generation from SCK clock.
+      // I2S_CLKCTRL_BITDELAY |  // No bit delay (PDM)
+      0;
+
+    clkctrl |= I2S_CLKCTRL_MCKOUTDIV(0);
+    clkctrl |= I2S_CLKCTRL_MCKDIV(0);
     
-    uint8_t div_val = i2s_clock_instance.clock.mck_out_div;
-    if ((div_val > 0x21) || (div_val == 0)) {
-      //return STATUS_ERR_INVALID_ARG;
-      return false;
+    clkctrl |= I2S_CLKCTRL_NBSLOTS(1);  // STEREO is '1' (subtract one)
+    clkctrl |= I2S_CLKCTRL_FSWIDTH(0);  // Frame Sync (FS) Pulse is 1 Slot width
+
+    if (stereo) {
+      clkctrl |= I2S_CLKCTRL_SLOTSIZE(I2S_SLOT_SIZE_16_BIT);
     } else {
-      div_val --;
+      clkctrl |= I2S_CLKCTRL_SLOTSIZE(I2S_SLOT_SIZE_32_BIT);
     }
-    clkctrl |= I2S_CLKCTRL_MCKOUTDIV(div_val);
-    
-    div_val = i2s_clock_instance.clock.sck_div;
-    if ((div_val > 0x21) || (div_val == 0)) {
-      //return STATUS_ERR_INVALID_ARG;
-      return false;
-    } else {
-      div_val --;
-    }
-    clkctrl |= I2S_CLKCTRL_MCKDIV(div_val);
-    
-    uint8_t number_slots = i2s_clock_instance.frame.number_slots;
-    if (number_slots > 8) {
-      //return STATUS_ERR_INVALID_ARG;
-      return false;
-    } else if (number_slots > 0) {
-      number_slots --;
-    }
-    clkctrl |=
-      I2S_CLKCTRL_NBSLOTS(number_slots) |
-      I2S_CLKCTRL_FSWIDTH(i2s_clock_instance.frame.frame_sync.width) |
-      I2S_CLKCTRL_SLOTSIZE(i2s_clock_instance.frame.slot_size);
     
     /* Write clock unit configurations */
     _hw->CLKCTRL[_i2sclock].reg = clkctrl;
@@ -345,7 +281,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     const uint8_t i2s_gclk_ids[2] = {I2S_GCLK_ID_0, I2S_GCLK_ID_1};
     struct system_gclk_chan_config gclk_chan_config;
     system_gclk_chan_get_config_defaults(&gclk_chan_config);
-    gclk_chan_config.source_generator = i2s_clock_instance.clock.gclk_src;
+    gclk_chan_config.source_generator = (enum gclk_generator)_gclk;
     system_gclk_chan_set_config(i2s_gclk_ids[_i2sclock], &gclk_chan_config);
     system_gclk_chan_enable(i2s_gclk_ids[_i2sclock]);
     
@@ -353,18 +289,9 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     {
       struct system_pinmux_config pin_config;
       system_pinmux_get_config_defaults(&pin_config);
-      if (i2s_clock_instance.mck_pin.enable) {
-	pin_config.mux_position = i2s_clock_instance.mck_pin.mux;
-	system_pinmux_pin_set_config(i2s_clock_instance.mck_pin.gpio, &pin_config);
-      }
-      if (i2s_clock_instance.sck_pin.enable) {
-	pin_config.mux_position = i2s_clock_instance.sck_pin.mux;
-	system_pinmux_pin_set_config(i2s_clock_instance.sck_pin.gpio, &pin_config);
-      }
-      if (i2s_clock_instance.fs_pin.enable) {
-	pin_config.mux_position = i2s_clock_instance.fs_pin.mux;
-	system_pinmux_pin_set_config(i2s_clock_instance.fs_pin.gpio, &pin_config);
-      }
+      
+      pin_config.mux_position = _clk_mux;
+      system_pinmux_pin_set_config(_clk_pin, &pin_config);
     }
   }
 
