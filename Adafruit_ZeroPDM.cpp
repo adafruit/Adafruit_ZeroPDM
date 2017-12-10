@@ -137,8 +137,15 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   // Configure the GCLK generator that will drive the I2S clocks.  This clock
   // will run at the SCK frequency by dividing the 48mhz main cpu clock.
   struct system_gclk_gen_config gclk_generator;
+
   // Load defaults for the clock generator.
-  system_gclk_gen_get_config_defaults(&gclk_generator);
+  // Replace "system_gclk_gen_get_config_defaults(&gclk_generator);" with:
+  gclk_generator.division_factor    = 1;
+  gclk_generator.high_when_disabled = false;
+  gclk_generator.source_clock       = GCLK_SOURCE_OSC8M;
+  gclk_generator.run_in_standby     = false;
+  gclk_generator.output_enable      = false;
+
   // Set the clock generator to use the 48mhz main CPU clock and divide it down
   // to the SCK frequency.
   gclk_generator.source_clock = SYSTEM_CLOCK_SOURCE_DFLL;
@@ -146,7 +153,18 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
   // Set the GCLK generator config and enable it.
   system_gclk_gen_set_config(_gclk, &gclk_generator);
-  system_gclk_gen_enable(_gclk);
+
+
+  // Replace "system_gclk_gen_enable(_gclk);" with:
+  while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
+  cpu_irq_enter_critical();
+  /* Select the requested generator */
+  *((uint8_t*)&GCLK->GENCTRL.reg) = _gclk;
+  while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);  // Wait for synchronization
+  /* Enable generator */
+  GCLK->GENCTRL.reg |= GCLK_GENCTRL_GENEN;
+  cpu_irq_leave_critical();
+
 
   // Configure I2S clock.
   struct i2s_clock_unit_config i2s_clock_instance;
