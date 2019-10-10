@@ -1,17 +1,10 @@
 #include "Adafruit_ZeroPDMSPI.h"
 
-volatile uint32_t *dataReg;
-
 static uint16_t const sincfilter[64] = { 0, 2, 9, 21, 39, 63, 94, 132, 179, 236, 302, 379, 467, 565, 674, 792, 920, 1055, 1196, 1341, 1487, 1633, 1776, 1913, 2042, 2159, 2263, 2352, 2422, 2474, 2506, 2516, 2506, 2474, 2422, 2352, 2263, 2159, 2042, 1913, 1776, 1633, 1487, 1341, 1196, 1055, 920, 792, 674, 565, 467, 379, 302, 236, 179, 132, 94, 63, 39, 21, 9, 2, 0, 0 };
 
 #define DC_PERIOD     4096 // Recalculate DC offset this many samplings
 // DC_PERIOD does NOT need to be a power of 2, but might save a few cycles.
 // PDM rate is 46875, so 4096 = 11.44 times/sec
-
-
-// PDM mic allows 1.0 to 3.25 MHz max clock (2.4 typical).
-// SPI native max is is 24 MHz, so available speeds are 12, 6, 3 MHz.
-#define SPI_BITRATE 3000000
 
 static Sercom * const sercomList[] = {
   SERCOM0, SERCOM1, SERCOM2, SERCOM3,
@@ -57,7 +50,7 @@ bool Adafruit_ZeroPDMSPI::begin(uint32_t freq) {
   _spi->beginTransaction(settings); // this SPI transaction is left open
   _sercom  = sercomList[_spi->getSercomIndex()];
   _irq = sercomIRQList[_spi->getSercomIndex()];
-  dataReg = _spi->getDataRegister();
+  _dataReg = _spi->getDataRegister();
 
   // Enabling 32-bit SPI must be done AFTER SPI.begin() which
   // resets registers. But SPI.CTRLC (where 32-bit mode is set) is
@@ -93,8 +86,8 @@ bool Adafruit_ZeroPDMSPI::decimateFilterWord(uint16_t *value, bool removeDC) {
   // the same register here, it's legit to write new MOSI value before
   // reading the received MISO value from the same location. This helps
   // avoid a gap between words...provides a steady stream of bits.
-  *dataReg = 0;               // Write clears DRE flag, starts next xfer
-  uint32_t sample = *dataReg; // Read last-received word
+  *_dataReg = 0;               // Write clears DRE flag, starts next xfer
+  uint32_t sample = *_dataReg; // Read last-received word
 
   uint32_t sum = 0;  // local var = register = faster than sumTemp
   if (evenWord) {     // Even-numbered 32-bit word...

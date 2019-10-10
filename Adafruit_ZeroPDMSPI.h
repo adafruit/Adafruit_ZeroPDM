@@ -44,6 +44,7 @@ private:
   SPIClass *_spi = NULL;
   Sercom *_sercom = NULL;
   IRQn_Type _irq;
+  volatile uint32_t *_dataReg;
 
   uint16_t       dcCounter        = 0;     // Rolls over every DC_PERIOD samples
   uint32_t       dcSum            = 0;     // Accumulates DC_PERIOD samples
