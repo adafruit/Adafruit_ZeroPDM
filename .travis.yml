@@ -26,7 +26,7 @@ install:
 #   - arduino --install-library "Adafruit LED Backpack Library","Adafruit GFX Library","Adafruit SleepyDog Library","Adafruit Zero FFT Library"
 
 script:
-   - build_platform cplayExpress
+   - build_platform cplayExpressAda
 #   - build_platform cplayExpress
 
 
