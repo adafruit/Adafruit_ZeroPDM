@@ -7,12 +7,18 @@
 Adafruit_ZeroPDMSPI pdmspi(&PDM_SPI);
 
 // INTERRUPT HANDLERS ------------------------------------------------------
-volatile uint16_t     voiceLastReading = 0;
+volatile int16_t     voiceLastReading = 0;
 void PDM_SERCOM_HANDLER(void) {
   digitalWrite(13, HIGH);
   uint16_t v = 0;
   if (pdmspi.decimateFilterWord(&v)) {
-    voiceLastReading = v;
+    // Outside code can use the value of voiceLastReading if you want to
+    // do an approximate live waveform display, or dynamic gain adjustment
+    // based on mic input, or other stuff. This won't give you every single
+    // sample in the recording buffer one-by-one sequentially...it's just
+    // the last thing that was stored prior to whatever time you polled it,
+    // but may still have some uses.
+    voiceLastReading = v - 32767;
   }
   digitalWrite(13, LOW);
 }
@@ -25,9 +31,7 @@ void setup() {
   Serial.println("PDM Mic test");
   Serial.println("-------------------");
   
-  // 3 MHz / 32 bits = 93,750 Hz interrupt frequency
-  // 2 interrupts/sample = 46,875 Hz audio sample rate
-  pdmspi.begin(46000);
+  pdmspi.begin(16000);
   Serial.print("Final PDM frequency: "); Serial.println(pdmspi.sampleRate);
 
   // Set up analog output ------------------------------------------
@@ -36,6 +40,6 @@ void setup() {
 
 
 void loop() {
-  int16_t val = map(voiceLastReading, 0, 65535, -2000, 2000);
-  analogWrite(A0, val + 2048);
+  analogWrite(A0, voiceLastReading + 2048);
+  //Serial.println(voiceLastReading);
 }
