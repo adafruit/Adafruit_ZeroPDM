@@ -25,10 +25,10 @@
 #ifndef ADAFRUIT_ZEROPDM_H
 #define ADAFRUIT_ZEROPDM_H
 
-#ifdef I2S
-
 #include <Arduino.h>
 #include "wiring_private.h"
+
+#if defined(I2S)
 
 // Uncomment to enable debug message output.
 #define DEBUG

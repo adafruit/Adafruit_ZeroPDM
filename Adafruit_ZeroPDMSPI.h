@@ -1,9 +1,9 @@
-// Adafruit Arduino Zero / Feather M0 PDM mic library.
-// Author: Tony DiCola & Limor "Ladyada" Fried
+// Adafruit SAMD51 PDM via SPI mic library.
+// Author: PaintYourDragon & Limor "Ladyada" Fried
 //
 // The MIT License (MIT)
 //
-// Copyright (c) 2016 Adafruit Industries
+// Copyright (c) 2019 Adafruit Industries
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,8 @@
 // SOFTWARE.
 #ifndef ADAFRUIT_ZEROPDMSPI_H
 #define ADAFRUIT_ZEROPDMSPI_H
+
+#if defined(__SAMD51__)
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -53,5 +55,7 @@ private:
 
   uint16_t       micGain          = 256;   // 1:1
 };
+
+#endif //defined(__SAMD51__)
 
 #endif

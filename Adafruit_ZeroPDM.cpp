@@ -24,7 +24,7 @@
 // SOFTWARE.
 #include "Adafruit_ZeroPDM.h"
 
-#ifdef I2S
+#if defined(I2S)
 
 // Define macros for debug output that optimize out when debug mode is disabled.
 #ifdef DEBUG
@@ -121,7 +121,7 @@ bool Adafruit_ZeroPDM::begin(void) {
     return false;
   }
 
-#if defined(__SAMD21__)
+#if defined(ARDUINO_SAMD_ZERO)
   // Initialize I2S module from the ASF.
   // replace "status_code res = i2s_init(&_i2s_instance, I2S);
   //  if (res != STATUS_OK) {
@@ -153,7 +153,7 @@ bool Adafruit_ZeroPDM::begin(void) {
 }
 
 void Adafruit_ZeroPDM::end(void) {
-#if defined(__SAMD21__)
+#if defined(ARDUINO_SAMD_ZERO)
   while (_hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE); // Sync wait
   _hw->CTRLA.reg &= ~I2S_SYNCBUSY_ENABLE;
 #endif
@@ -168,7 +168,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
   /******************************* Set the GCLK generator config and enable it. *************/
   {
-#if defined(__SAMD21__)
+#if defined(ARDUINO_SAMD_ZERO)
     /* Cache new register configurations to minimize sync requirements. */
     uint32_t new_genctrl_config = (_gclk << GCLK_GENCTRL_ID_Pos);
     uint32_t new_gendiv_config  = (_gclk << GCLK_GENDIV_ID_Pos);
@@ -234,7 +234,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   
   /******************************* Configure I2S clock *************/
   {
-#if defined(__SAMD21__)
+#if defined(ARDUINO_SAMD_ZERO)
     /* Status check */
     /* Busy ? */
     if (_hw->SYNCBUSY.reg & (I2S_SYNCBUSY_CKEN0 << _i2sclock)) {
@@ -314,7 +314,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
   /***************************** Configure I2S serializer *************/
   {
-#if defined(__SAMD21__)
+#if defined(ARDUINO_SAMD_ZERO)
 
     /* Status check */
     /* Busy ? */
@@ -377,7 +377,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
   /***************************** Enable everything configured above *************/
 
-#if defined(__SAMD21__)
+#if defined(ARDUINO_SAMD_ZERO)
   // Replace "i2s_enable(&_i2s_instance);" with:
   while (_hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE);  // Sync wait
   _hw->CTRLA.reg |= I2S_SYNCBUSY_ENABLE;
@@ -402,7 +402,7 @@ uint32_t Adafruit_ZeroPDM::read(void) {
 
   // replace i2s_serializer_read_wait with deASF'd code:
   {
-#if defined(__SAMD21__)
+#if defined(ARDUINO_SAMD_ZERO)
     uint32_t sync_bit, ready_bit;
     uint32_t data;
     ready_bit = I2S_INTFLAG_RXRDY0 << _i2sserializer;

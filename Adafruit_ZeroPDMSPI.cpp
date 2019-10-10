@@ -1,5 +1,7 @@
 #include "Adafruit_ZeroPDMSPI.h"
 
+#if defined(__SAMD51__)
+
 static uint16_t const sincfilter[64] = { 0, 2, 9, 21, 39, 63, 94, 132, 179, 236, 302, 379, 467, 565, 674, 792, 920, 1055, 1196, 1341, 1487, 1633, 1776, 1913, 2042, 2159, 2263, 2352, 2422, 2474, 2506, 2516, 2506, 2474, 2422, 2352, 2263, 2159, 2042, 1913, 1776, 1633, 1487, 1341, 1196, 1055, 920, 792, 674, 565, 467, 379, 302, 236, 179, 132, 94, 63, 39, 21, 9, 2, 0, 0 };
 
 #define DC_PERIOD     4096 // Recalculate DC offset this many samplings
@@ -28,7 +30,7 @@ static IRQn_Type const sercomIRQList[] {
   SERCOM4_0_IRQn,
 #endif
 #if defined(SERCOM5)
-  SERCOM5_0_IRQn,
+  SERCOM5_0_IRQn, 
 #endif
 #if defined(SERCOM6)
   SERCOM6_0_IRQn,
@@ -199,3 +201,5 @@ bool Adafruit_ZeroPDMSPI::decimateFilterWord(uint16_t *value, bool removeDC) {
 
   return evenWord;
 }
+
+#endif //defined(__SAMD51__)
