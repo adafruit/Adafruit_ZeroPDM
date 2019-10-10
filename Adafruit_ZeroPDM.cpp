@@ -50,18 +50,33 @@ bool Adafruit_ZeroPDM::begin(void) {
   if ((clockport == 0) && (clockpin == 10)) {
     // PA10
     _i2sclock = I2S_CLOCK_UNIT_0;
+#if defined(PIN_PA10G_I2S_SCK0)
     _clk_pin = PIN_PA10G_I2S_SCK0;
     _clk_mux = MUX_PA10G_I2S_SCK0;
+#elif defined(PIN_PA10J_I2S_SCK0)
+    _clk_pin = PIN_PA10J_I2S_SCK0;
+    _clk_mux = MUX_PA10J_I2S_SCK0;
+#endif
   } else if ((clockport == 1) && (clockpin == 10)) {
     // PB11
     _i2sclock = I2S_CLOCK_UNIT_1;
+#if defined(PIN_PB11G_I2S_SCK1)
     _clk_pin = PIN_PB11G_I2S_SCK1;
     _clk_mux = MUX_PB11G_I2S_SCK1;
+#elif defined(PIN_PB11J_I2S_SCK1)
+    _clk_pin = PIN_PB11J_I2S_SCK1;
+    _clk_mux = MUX_PB11J_I2S_SCK1;
+#endif
   } else if ((clockport == 0) && (clockpin == 20)) {
     // PA20
     _i2sclock = I2S_CLOCK_UNIT_0;
+#if defined(PIN_PA20G_I2S_SCK0)
     _clk_pin = PIN_PA20G_I2S_SCK0;
     _clk_mux = MUX_PA20G_I2S_SCK0;
+#elif defined(PIN_PA20J_I2S_SCK0)
+    _clk_pin = PIN_PA20J_I2S_SCK0;
+    _clk_mux = MUX_PA20J_I2S_SCK0;
+#endif
   } else {
     DEBUG_PRINTLN("Clock isnt on a valid pin");
     return false;
@@ -73,23 +88,39 @@ bool Adafruit_ZeroPDM::begin(void) {
   if ((dataport == 0) && (datapin == 7)) {
     // PA07
     _i2sserializer = I2S_SERIALIZER_0;
+#if defined(PIN_PA07G_I2S_SD0)
     _data_pin = PIN_PA07G_I2S_SD0;
     _data_mux = MUX_PA07G_I2S_SD0;
+#elif defined(PIN_PA07J_I2S_SD0)
+    _data_pin = PIN_PA07J_I2S_SD0;
+    _data_mux = MUX_PA07J_I2S_SD0;
+#endif
   } else if ((dataport == 0) && (datapin == 8)) {
     // PA08
     _i2sserializer = I2S_SERIALIZER_1;
+#if defined(PIN_PA08G_I2S_SD1)
     _data_pin = PIN_PA08G_I2S_SD1;
     _data_mux = MUX_PA08G_I2S_SD1;
+#elif defined(PIN_PA08J_I2S_SD1)
+    _data_pin = PIN_PA08J_I2S_SD1;
+    _data_mux = MUX_PA08J_I2S_SD1;
+#endif
   } else if ((dataport == 0) && (datapin == 19)) {
     // PA19
     _i2sserializer = I2S_SERIALIZER_0;
+#if defined(PIN_PA19G_I2S_SD0)
     _data_pin = PIN_PA19G_I2S_SD0;
     _data_mux = MUX_PA19G_I2S_SD0;
+#elif defined(PIN_PA19J_I2S_SD0)
+    _data_pin = PIN_PA19J_I2S_SD0;
+    _data_mux = MUX_PA19J_I2S_SD0;
+#endif
   } else {
     DEBUG_PRINTLN("Data isnt on a valid pin");
     return false;
   }
 
+#if defined(__SAMD21__)
   // Initialize I2S module from the ASF.
   // replace "status_code res = i2s_init(&_i2s_instance, I2S);
   //  if (res != STATUS_OK) {
@@ -113,7 +144,7 @@ bool Adafruit_ZeroPDM::begin(void) {
       return false;
     }
   }
-
+#endif
   /* Initialize module */
   _hw = I2S;
 
@@ -121,8 +152,10 @@ bool Adafruit_ZeroPDM::begin(void) {
 }
 
 void Adafruit_ZeroPDM::end(void) {
+#if defined(__SAMD21__)
   while (_hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE); // Sync wait
   _hw->CTRLA.reg &= ~I2S_SYNCBUSY_ENABLE;
+#endif
 }
 
 bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
@@ -134,6 +167,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
   /******************************* Set the GCLK generator config and enable it. *************/
   {
+#if defined(__SAMD21__)
     /* Cache new register configurations to minimize sync requirements. */
     uint32_t new_genctrl_config = (_gclk << GCLK_GENCTRL_ID_Pos);
     uint32_t new_gendiv_config  = (_gclk << GCLK_GENDIV_ID_Pos);
@@ -194,10 +228,12 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     GCLK->GENCTRL.reg |= GCLK_GENCTRL_GENEN;          /* Enable generator */
     
     interrupts();  // cpu_irq_leave_critical();
+#endif
   }
   
   /******************************* Configure I2S clock *************/
   {
+#if defined(__SAMD21__)
     /* Status check */
     /* Busy ? */
     if (_hw->SYNCBUSY.reg & (I2S_SYNCBUSY_CKEN0 << _i2sclock)) {
@@ -272,10 +308,13 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
 
     /* Initialize pins */
     pinPeripheral(_clk, (EPioType)_clk_mux);
+#endif
   }
 
   /***************************** Configure I2S serializer *************/
   {
+#if defined(__SAMD21__)
+
     /* Status check */
     /* Busy ? */
     while (_hw->SYNCBUSY.reg & ((I2S_SYNCBUSY_SEREN0 | I2S_SYNCBUSY_DATA0) << _i2sserializer)) {
@@ -332,10 +371,12 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     /* Initialize pins */
     // Enable SD pin.  See Adafruit_ZeroI2S.h for default pin value.
     pinPeripheral(_data, (EPioType)_data_mux);
+#endif
   }
 
   /***************************** Enable everything configured above *************/
 
+#if defined(__SAMD21__)
   // Replace "i2s_enable(&_i2s_instance);" with:
   while (_hw->SYNCBUSY.reg & I2S_SYNCBUSY_ENABLE);  // Sync wait
   _hw->CTRLA.reg |= I2S_SYNCBUSY_ENABLE;
@@ -349,7 +390,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
   uint32_t seren_bit = I2S_CTRLA_SEREN0 << _i2sserializer;
   while (_hw->SYNCBUSY.reg & seren_bit); // Sync wait
   _hw->CTRLA.reg |= seren_bit;
-  
+#endif
   return true;
 }
 
@@ -360,6 +401,7 @@ uint32_t Adafruit_ZeroPDM::read(void) {
 
   // replace i2s_serializer_read_wait with deASF'd code:
   {
+#if defined(__SAMD21__)
     uint32_t sync_bit, ready_bit;
     uint32_t data;
     ready_bit = I2S_INTFLAG_RXRDY0 << _i2sserializer;
@@ -374,5 +416,6 @@ uint32_t Adafruit_ZeroPDM::read(void) {
     data = _hw->DATA[_i2sserializer].reg;
     _hw->INTFLAG.reg = ready_bit;
     return data;
+#endif
   }
 }

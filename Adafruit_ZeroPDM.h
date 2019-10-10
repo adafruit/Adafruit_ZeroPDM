@@ -57,11 +57,11 @@ public:
   bool read(uint32_t *buffer, int bufsiz);
 
 private:
+  uint8_t _gclk;
   int _clk, _data;
   uint32_t _clk_pin, _clk_mux, _data_pin, _data_mux;
   uint8_t _i2sserializer;
   uint8_t _i2sclock;
-  uint8_t _gclk;
 
   I2s *_hw;
 };
