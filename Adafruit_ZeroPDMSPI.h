@@ -29,13 +29,6 @@
 #include <SPI.h>
 #include "wiring_private.h"
 
-// Uncomment to enable debug message output.
-#define DEBUG
-
-// Define where debug output is printed (the native USB port on the Zero).
-#define DEBUG_PRINTER Serial
-
-
 class Adafruit_ZeroPDMSPI {
 public:
   // Create a new instance of an PDM audio transmitter over SPI
@@ -43,16 +36,6 @@ public:
 
   // Initialize the SPI audio receiver.
   bool begin(uint32_t freq);
-  void end();
-
-  // Configure the transmitter with the sample rate (in hertz
-  bool configure(uint32_t sampleRateHz, boolean stereo);
-
-  // Read a single sample from the SPI subsystem.  Will wait until the SPI
-  // hardware is ready to receive the sample.
-  uint32_t read(void);
-
-  bool read(uint32_t *buffer, int bufsiz);
 
   bool decimateFilterWord(uint16_t *value, bool removeDC=true); 
 
@@ -67,7 +50,7 @@ private:
   uint16_t       dcOffsetPrior    = 32768; // DC offset interpolates linearly
   uint16_t       dcOffsetNext     = 32768; // between these two values
 
-  uint16_t       micGain          = 1024;   // 1:1
+  uint16_t       micGain          = 256;   // 1:1
 };
 
 #endif

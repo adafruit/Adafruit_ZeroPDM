@@ -174,35 +174,33 @@ bool Adafruit_ZeroPDMSPI::decimateFilterWord(uint16_t *value, bool removeDC) {
     if(sample & 0x80000000) sum += sincfilter[63];
     sum += sumTemp; // Add static var from last call
 
+    if (removeDC) {
     // 'sum' is new raw audio value -- process it --------------------------
-    uint16_t dcOffset;
-  
-    dcSum += sum; // Accumulate long-term average for DC offset correction
-    if(++dcCounter < DC_PERIOD) {
-      // Interpolate between dcOffsetPrior and dcOffsetNext
-      dcOffset = dcOffsetPrior + (dcOffsetNext - dcOffsetPrior) * dcCounter / DC_PERIOD;
+      uint16_t dcOffset;
+      
+      dcSum += sum; // Accumulate long-term average for DC offset correction
+      if(++dcCounter < DC_PERIOD) {
+	// Interpolate between dcOffsetPrior and dcOffsetNext
+	dcOffset = dcOffsetPrior + (dcOffsetNext - dcOffsetPrior) * dcCounter / DC_PERIOD;
+      } else {
+	// End of period reached, move 'next' to 'previous,' calc new 'next' from avg
+	dcOffsetPrior = dcOffset = dcOffsetNext;
+	dcOffsetNext  = dcSum / DC_PERIOD;
+	dcCounter     = dcSum    = 0;
+      }
+      
+      // Adjust raw reading by DC offset to center (ish) it, scale by mic gain
+      int32_t adjusted = ((int32_t)sum - dcOffset) * micGain / 256;
+      
+      // Go back to uint16_t space and clip to 16-bit range
+      adjusted += 32768;
+      if(adjusted > 65535)  adjusted = 65535;
+      else if (adjusted < 0) adjusted = 0;
+
+      *value = adjusted;
     } else {
-      // End of period reached, move 'next' to 'previous,' calc new 'next' from avg
-      dcOffsetPrior = dcOffset = dcOffsetNext;
-      dcOffsetNext  = dcSum / DC_PERIOD;
-      dcCounter     = dcSum    = 0;
+      *value = sum;
     }
-
-    // Adjust raw reading by DC offset to center (ish) it, scale by mic gain
-    int32_t adjusted = ((int32_t)sum - dcOffset) * micGain / 256;
-
-    // Go back to uint16_t space and clip to 16-bit range
-    adjusted += 32768;
-    if(adjusted > 65535)  adjusted = 65535;
-    else if (adjusted < 0) adjusted = 0;
-
-    // Outside code can use the value of voiceLastReading if you want to
-    // do an approximate live waveform display, or dynamic gain adjustment
-    // based on mic input, or other stuff. This won't give you every single
-    // sample in the recording buffer one-by-one sequentially...it's just
-    // the last thing that was stored prior to whatever time you polled it,
-    // but may still have some uses.
-    *value = adjusted;    
   }
   evenWord = !evenWord;
 
