@@ -42,7 +42,7 @@ public:
   Adafruit_ZeroPDMSPI(SPIClass *theSPI); 
 
   // Initialize the SPI audio receiver.
-  bool begin();
+  bool begin(uint32_t freq);
   void end();
 
   // Configure the transmitter with the sample rate (in hertz

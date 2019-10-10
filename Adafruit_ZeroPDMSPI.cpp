@@ -12,7 +12,6 @@ static uint16_t const sincfilter[64] = { 0, 2, 9, 21, 39, 63, 94, 132, 179, 236,
 // PDM mic allows 1.0 to 3.25 MHz max clock (2.4 typical).
 // SPI native max is is 24 MHz, so available speeds are 12, 6, 3 MHz.
 #define SPI_BITRATE 3000000
-static SPISettings settings(SPI_BITRATE, LSBFIRST, SPI_MODE0);
 
 static Sercom * const sercomList[] = {
   SERCOM0, SERCOM1, SERCOM2, SERCOM3,
@@ -50,7 +49,10 @@ Adafruit_ZeroPDMSPI::Adafruit_ZeroPDMSPI(SPIClass *theSPI) {
   _spi = theSPI;
 }
 
-bool Adafruit_ZeroPDMSPI::begin() {
+bool Adafruit_ZeroPDMSPI::begin(uint32_t freq) {
+  freq *= 64;
+  SPISettings settings(freq, LSBFIRST, SPI_MODE0);
+
   _spi->begin();
   _spi->beginTransaction(settings); // this SPI transaction is left open
   _sercom  = sercomList[_spi->getSercomIndex()];
@@ -76,11 +78,9 @@ bool Adafruit_ZeroPDMSPI::begin() {
 
   _sercom->SPI.DATA.bit.DATA     = 0;      // Kick off SPI free-run
 
-  // 3 MHz / 32 bits = 93,750 Hz interrupt frequency
-  // 2 interrupts/sample = 46,875 Hz audio sample rate
-  sampleRate = (float)SPI_BITRATE / 64.0;
   // sampleRate is float in case factors change to make it not divide evenly.
   // It DOES NOT CHANGE over time, only playbackRate does.
+  sampleRate = (48000000.0 / 2.0) / ((_sercom->SPI.BAUD.reg + 1) * 64.0);
 
   return true; // Success
 }
