@@ -25,6 +25,8 @@
 #ifndef ADAFRUIT_ZEROPDM_H
 #define ADAFRUIT_ZEROPDM_H
 
+#ifdef I2S
+
 #include <Arduino.h>
 #include "wiring_private.h"
 
@@ -297,7 +299,8 @@ enum i2s_serializer {
 };
 
 
-#endif
+#endif  // I2S header include
 
+#endif  // I2S defined
 
-#endif
+#endif  // ADAFRUIT_ZEROPDM_H

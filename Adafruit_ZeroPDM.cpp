@@ -24,6 +24,7 @@
 // SOFTWARE.
 #include "Adafruit_ZeroPDM.h"
 
+#ifdef I2S
 
 // Define macros for debug output that optimize out when debug mode is disabled.
 #ifdef DEBUG
@@ -419,3 +420,5 @@ uint32_t Adafruit_ZeroPDM::read(void) {
 #endif
   }
 }
+
+#endif  // I2S defined
