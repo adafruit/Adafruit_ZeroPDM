@@ -27,8 +27,8 @@ install:
 
 script:
    - build_platform cplayExpressAda
-   - build_platform pybadge
-   - build_platform m4sk
+#   - build_platform pybadge
+#   - build_platform m4sk
 
 
 # Generate and deploy documentation
