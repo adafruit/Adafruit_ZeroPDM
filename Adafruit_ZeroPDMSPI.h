@@ -41,6 +41,8 @@ public:
 
   bool decimateFilterWord(uint16_t *value, bool removeDC=true); 
 
+  void setMicGain(float g=1.0);
+
   float sampleRate;
 private:
   SPIClass *_spi = NULL;

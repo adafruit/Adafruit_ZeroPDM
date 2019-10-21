@@ -202,4 +202,11 @@ bool Adafruit_ZeroPDMSPI::decimateFilterWord(uint16_t *value, bool removeDC) {
   return evenWord;
 }
 
+// Adjust input gain, higher = amplify, 1.0 = normal, no adjustment
+void Adafruit_ZeroPDMSPI::setMicGain(float g) {
+  if(g > (65535.0 / 256.0)) g = (65535.0 / 256.0); // sic
+  else if(g < 0.0)          g = 0.0;
+  micGain = (uint16_t)(g * 256.0 + 0.5);
+}
+
 #endif //defined(__SAMD51__)
