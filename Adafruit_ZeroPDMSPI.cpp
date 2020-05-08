@@ -1,6 +1,34 @@
+/**************************************************************************/
+/*!
+ * @file Adafruit_ZeroPDMSPI.cpp
+ *
+ * @mainpage PDM microphone library for the SAMD21 processor.
+ *
+ * @section intro_sec2 Introduction
+ *
+ *  Adafruit SAMD51 PDM via SPI mic library.
+ *
+ *  Adafruit invests time and resources providing this open source code,
+ *  please support Adafruit and open-source hardware by purchasing
+ *  products from Adafruit!
+ *
+ * @section author2 Author
+ *
+ * Written by Tony DiCola & Limor "ladyada" Fried for Adafruit Industries.
+ *
+ * @section license2 License
+ *
+ * MIT license, check license.txt for more information. All text above must be
+ * included in any redistribution
+ *
+ */
+/**************************************************************************/
+
 #include "Adafruit_ZeroPDMSPI.h"
 
+/// @cond SAMD51
 #if defined(__SAMD51__)
+/// @endcond
 
 static uint16_t const sincfilter[64] = {
     0,    2,    9,    21,   39,   63,   94,   132,  179,  236,  302,
@@ -284,4 +312,6 @@ void Adafruit_ZeroPDMSPI::setMicGain(float g) {
   micGain = (uint16_t)(g * 256.0 + 0.5);
 }
 
+/// @cond SAMD51
 #endif // defined(__SAMD51__)
+       /// @endcond
