@@ -1,63 +1,70 @@
-// Adafruit SAMD51 PDM via SPI mic library.
-// Author: PaintYourDragon & Limor "Ladyada" Fried
-//
-// The MIT License (MIT)
-//
-// Copyright (c) 2019 Adafruit Industries
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+/*!
+ * @file Adafruit_ZeroPDMSPI.h
+ */
 #ifndef ADAFRUIT_ZEROPDMSPI_H
 #define ADAFRUIT_ZEROPDMSPI_H
 
+/// @cond DISABLE
 #if defined(__SAMD51__)
+/// @endcond DISABLE
 
+#include "wiring_private.h"
 #include <Arduino.h>
 #include <SPI.h>
-#include "wiring_private.h"
 
+/*!
+ * ZeroPDM SPI driver
+ */
 class Adafruit_ZeroPDMSPI {
 public:
-  // Create a new instance of an PDM audio transmitter over SPI
-  Adafruit_ZeroPDMSPI(SPIClass *theSPI); 
+  /*!
+   * @brief Create a new instance of an PDM audio transmitter over SPI
+   * @param theSPI SPI to use
+   */
+  Adafruit_ZeroPDMSPI(SPIClass *theSPI);
 
-  // Initialize the SPI audio receiver.
+  /*!
+   * @brief Initialize the SPI audio receiver.
+   * @param freq Frequency (in Hertz)
+   * @return Returns if connection was successful
+   */
   bool begin(uint32_t freq);
 
-  bool decimateFilterWord(uint16_t *value, bool removeDC=true); 
+  /*!
+   * @brief Alternates 0 to 1 to let you know that data is ready to be read
+   * @param value Variable to set the reading to
+   * @param removeDC Whether or not to remove the DC offset
+   * @return Returns if the word is even or not
+   */
+  bool decimateFilterWord(uint16_t *value, bool removeDC = true);
 
-  void setMicGain(float g=1.0);
+  /*!
+   * @brief Sets the mic gain
+   * @param g Mic gain
+   */
+  void setMicGain(float g = 1.0);
 
+  /*!
+   * @brief Sample rate
+   */
   float sampleRate;
+
 private:
   SPIClass *_spi = NULL;
   Sercom *_sercom = NULL;
   IRQn_Type _irq;
   volatile uint32_t *_dataReg;
 
-  uint16_t       dcCounter        = 0;     // Rolls over every DC_PERIOD samples
-  uint32_t       dcSum            = 0;     // Accumulates DC_PERIOD samples
-  uint16_t       dcOffsetPrior    = 32768; // DC offset interpolates linearly
-  uint16_t       dcOffsetNext     = 32768; // between these two values
+  uint16_t dcCounter = 0;         // Rolls over every DC_PERIOD samples
+  uint32_t dcSum = 0;             // Accumulates DC_PERIOD samples
+  uint16_t dcOffsetPrior = 32768; // DC offset interpolates linearly
+  uint16_t dcOffsetNext = 32768;  // between these two values
 
-  uint16_t       micGain          = 256;   // 1:1
+  uint16_t micGain = 256; // 1:1
 };
 
-#endif //defined(__SAMD51__)
+/// @cond DISABLE
+#endif // defined(__SAMD51__)
+/// @endcond DISABLE
 
 #endif
