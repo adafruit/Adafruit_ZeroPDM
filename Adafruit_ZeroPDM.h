@@ -5,7 +5,8 @@
 #define ADAFRUIT_ZEROPDM_H
 
 #include <Arduino.h>
-#include "wiring_private.h"
+#include "WVariant.h" // EPioType defined here
+#include "wiring_private.h" // pinPeripheral() function
 
 /// @cond DISABLE
 #if defined(I2S)
