@@ -8,7 +8,6 @@
 #if defined(__SAMD51__)
 /// @endcond DISABLE
 
-#include "wiring_private.h"
 #include <Arduino.h>
 #include <SPI.h>
 
