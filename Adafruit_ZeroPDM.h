@@ -4,8 +4,8 @@
 #ifndef ADAFRUIT_ZEROPDM_H
 #define ADAFRUIT_ZEROPDM_H
 
-#include "wiring_private.h"
 #include <Arduino.h>
+#include "wiring_private.h"
 
 /// @cond DISABLE
 #if defined(I2S)
