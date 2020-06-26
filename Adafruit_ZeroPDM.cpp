@@ -36,7 +36,7 @@
  * SOFTWARE.
  */
 #include "Adafruit_ZeroPDM.h"
-#include "WVariant.h" // EPioType defined here
+#include "WVariant.h"       // EPioType defined here
 #include "wiring_private.h" // pinPeripheral() function
 
 /// @cond DISABLE
