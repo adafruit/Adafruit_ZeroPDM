@@ -340,7 +340,7 @@ bool Adafruit_ZeroPDM::configure(uint32_t sampleRateHz, boolean stereo) {
     /* Initialize pins */
     pinPeripheral(_clk, (EPioType)_clk_mux);
 #else
-    (void)stereo; // Prevent compiler warning
+    (void)stereo;       // Prevent compiler warning
 #endif
   }
 
